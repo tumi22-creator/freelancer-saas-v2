@@ -1,46 +1,54 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        email,
-        password,
-      }),
-    });
+    try {
+      setLoading(true);
 
-    const data = await res.json();
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+      });
 
-    if (res.ok) {
-      localStorage.setItem("token", data.token);
+      const data = await res.json();
 
-      alert("Login successful!");
-      window.location.href = "/dashboard";
-    } else {
-      alert(data.error);
+      if (res.ok) {
+        alert("Login successful!");
+        window.location.href = "/dashboard";
+      } else {
+        alert(data.error || "Login failed");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Something went wrong");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <div className="w-full max-w-md rounded-xl border p-6 space-y-4">
-        <h1 className="text-2xl font-bold">
-          Login
-        </h1>
+    <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="w-full max-w-md space-y-4 rounded-2xl border bg-white p-6 shadow-sm">
+        <h1 className="text-2xl font-bold">Login</h1>
 
         <input
           type="email"
           placeholder="Email"
-          className="w-full border rounded p-2"
+          className="w-full rounded border p-3"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
@@ -48,17 +56,27 @@ export default function LoginPage() {
         <input
           type="password"
           placeholder="Password"
-          className="w-full border rounded p-2"
+          className="w-full rounded border p-3"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
 
         <button
           onClick={handleLogin}
-          className="w-full rounded bg-black p-2 text-white"
+          disabled={loading}
+          className="w-full rounded bg-black p-3 text-white"
         >
-          Login
+          {loading ? "Logging in..." : "Login"}
         </button>
+        <p className="text-center text-sm text-gray-400">
+            Don&apos;t have an account?{" "}
+          <Link
+            href="/signup"
+            className="text-blue-400 hover:underline"
+  >
+    Signup
+  </Link>
+</p>
       </div>
     </div>
   );

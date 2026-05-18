@@ -1,24 +1,64 @@
+import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 
 export async function POST(req: Request) {
-  const { email, password } = await req.json();
+  try {
+    const body = await req.json();
 
-  // TODO: verify user with Prisma (you already have this)
+    const { email, password } = body;
 
-  const token = jwt.sign(
-    { email },
-    process.env.JWT_SECRET!
-  );
+    const user = await prisma.user.findUnique({
+      where: {
+        email,
+      },
+    });
 
-  const res = NextResponse.json({ message: "Login successful" });
+    if (!user) {
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      );
+    }
 
-  res.cookies.set("token", token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-  });
+    // TEMP SIMPLE PASSWORD CHECK
+    if (user.password !== password) {
+      return NextResponse.json(
+        { error: "Incorrect password" },
+        { status: 401 }
+      );
+    }
 
-  return res;
+    const token = jwt.sign(
+      {
+        id: user.id,
+        email: user.email,
+      },
+      process.env.JWT_SECRET!,
+      {
+        expiresIn: "7d",
+      }
+    );
+
+    const res = NextResponse.json({
+      success: true,
+      token,
+    });
+
+    res.cookies.set("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+    });
+
+    return res;
+  } catch (error) {
+    console.error(error);
+
+    return NextResponse.json(
+      { error: "Login failed" },
+      { status: 500 }
+    );
+  }
 }

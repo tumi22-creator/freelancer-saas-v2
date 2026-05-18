@@ -1,20 +1,26 @@
-import { prisma } from "../../../lib/prisma";
+import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
-    const { id, title } = body;
 
-    const updated = await prisma.project.update({
-      where: { id },
-      data: { title },
+    const { id, title, status } = body;
+
+    const updatedProject = await prisma.project.update({
+      where: {
+        id,
+      },
+      data: {
+        ...(title && { title }),
+        ...(status && { status }),
+      },
     });
 
-    return NextResponse.json(updated);
+    return NextResponse.json(updatedProject);
   } catch (error) {
     return NextResponse.json(
-      { error: "Update failed" },
+      { error: "Failed to update project" },
       { status: 500 }
     );
   }

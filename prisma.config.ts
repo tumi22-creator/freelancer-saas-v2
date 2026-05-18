@@ -9,6 +9,6 @@ export default defineConfig({
   },
 
   datasource: {
-    url: process.env.DATABASE_URL!,
+    url: process.env.DATABASE_URL="postgresql://neondb_owner:npg_JiEFW6P5Qxet@ep-winter-leaf-aq3zs49z.c-8.us-east-1.aws.neon.tech/neondb?sslmode=require",
   },
 });

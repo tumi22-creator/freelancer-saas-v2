@@ -15,6 +15,8 @@ model User {
   createdAt DateTime  @default(now())
 
   projects Project[]
+  clients  Client[]
+  activities Activity[]
 }
 
 model Project {
@@ -22,7 +24,35 @@ model Project {
   title       String
   description String?
   status      String   @default("active")
+  priority    String?  @default("medium")
+  dueDate     DateTime?
+  fileUrl     String?
   createdAt   DateTime @default(now())
+
+  clientId String?
+  client   Client? @relation(fields: [clientId], references: [id])
+
+  userId String
+  user   User @relation(fields: [userId], references: [id])
+}
+
+model Client {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  company   String?
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User @relation(fields: [userId], references: [id])
+
+  projects Project[]
+}
+
+model Activity {
+  id        String   @id @default(cuid())
+  message   String
+  createdAt DateTime @default(now())
 
   userId String
   user   User @relation(fields: [userId], references: [id])

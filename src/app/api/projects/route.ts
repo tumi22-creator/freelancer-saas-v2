@@ -1,135 +1,161 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
-import { cookies } from "next/headers";
+import { logActivity } from "@/lib/activity";
 
-interface JwtPayload {
-  id: string;
-  email: string;
-}
+function getUser(req: Request) {
+  const cookie = req.headers.get("cookie") || "";
 
-async function getUserId() {
-  const cookieStore = await cookies();
+  const token = cookie
+    .split("token=")[1]
+    ?.split(";")[0];
 
-  const token = cookieStore.get("token")?.value;
-
-  if (!token) {
-    return null;
-  }
+  if (!token) return null;
 
   try {
-    const decoded = jwt.verify(
+    return jwt.verify(
       token,
       process.env.JWT_SECRET!
-    ) as JwtPayload;
-
-    return decoded.id;
+    ) as {
+      id: string;
+      email: string;
+    };
   } catch {
     return null;
   }
 }
 
-export async function GET() {
-  try {
-    const userId = await getUserId();
+export async function GET(req: Request) {
+  const user = getUser(req);
 
-    if (!userId) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-
-    const projects = await prisma.project.findMany({
-      where: {
-        userId,
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
-
-    return NextResponse.json(projects);
-  } catch (error) {
-    console.error(error);
-
+  if (!user) {
     return NextResponse.json(
-      { error: "Failed to fetch projects" },
-      { status: 500 }
+      { error: "Unauthorized" },
+      { status: 401 }
     );
   }
+
+  const projects = await prisma.project.findMany({
+    where: {
+      userId: user.id,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  return NextResponse.json(projects);
 }
 
 export async function POST(req: Request) {
-  try {
-    const userId = await getUserId();
+  const user = getUser(req);
 
-    if (!userId) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-
-    const body = await req.json();
-
-    const { title, description } = body;
-
-    const project = await prisma.project.create({
-      data: {
-        title,
-        description,
-        userId,
-      },
-    });
-
-    return NextResponse.json(project);
-  } catch (error) {
-    console.error(error);
-
+  if (!user) {
     return NextResponse.json(
-      { error: "Failed to create project" },
-      { status: 500 }
+      { error: "Unauthorized" },
+      { status: 401 }
     );
   }
+
+  const body = await req.json();
+
+  const project = await prisma.project.create({
+    data: {
+      title: body.title,
+      description: body.description,
+      priority: body.priority,
+      dueDate: body.dueDate
+        ? new Date(body.dueDate)
+        : null,
+      userId: user.id,
+    },
+  });
+
+  // LOG ACTIVITY
+  await logActivity(
+    user.id,
+    `Created project: ${project.title}`
+  );
+
+  return NextResponse.json(project);
+}
+
+export async function PATCH(req: Request) {
+  const body = await req.json();
+
+  const project = await prisma.project.update({
+    where: {
+      id: body.id,
+    },
+    data: {
+      status: body.status,
+    },
+  });
+
+  return NextResponse.json(project);
 }
 
 export async function DELETE(req: Request) {
+  const { searchParams } = new URL(req.url);
+
+  const id = searchParams.get("id");
+
+  if (!id) {
+    return NextResponse.json(
+      { error: "Missing ID" },
+      { status: 400 }
+    );
+  }
+
+  // FIND PROJECT FIRST
+  const project = await prisma.project.findUnique({
+    where: {
+      id,
+    },
+  });
+
+  if (!project) {
+    return NextResponse.json(
+      { error: "Project not found" },
+      { status: 404 }
+    );
+  }
+
+  // LOG DELETE
+  await logActivity(
+    project.userId,
+    `Deleted project: ${project.title}`
+  );
+
+  // DELETE PROJECT
+  await prisma.project.delete({
+    where: {
+      id,
+    },
+  });
+
+  return NextResponse.json({
+    success: true,
+  });
+}
+
+export async function PUT(req: Request) {
   try {
-    const userId = await getUserId();
+    const body = await req.json();
 
-    if (!userId) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
+    const { id, status } = body;
 
-    const { searchParams } = new URL(req.url);
-
-    const id = searchParams.get("id");
-
-    if (!id) {
-      return NextResponse.json(
-        { error: "Missing id" },
-        { status: 400 }
-      );
-    }
-
-    await prisma.project.delete({
-      where: {
-        id,
+    const updated = await prisma.project.update({
+      where: { id },
+      data: {
+        status,
       },
     });
 
-    return NextResponse.json({
-      success: true,
-    });
+    return NextResponse.json(updated);
   } catch (error) {
-    console.error(error);
-
     return NextResponse.json(
-      { error: "Failed to delete project" },
+      { error: "Failed to update project" },
       { status: 500 }
     );
   }
